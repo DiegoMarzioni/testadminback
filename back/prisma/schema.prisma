@@ -1,0 +1,156 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Usuario para autenticación
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  role      String   @default("admin") // super_admin, admin, seller
+  isActive  Boolean  @default(true)
+  // Relaciones como vendedor
+  productsAsVendor Product[] @relation("ProductSeller")
+  ordersAsBuyer    Order[]   @relation("OrderBuyer")
+  ordersAsSeller   Order[]   @relation("OrderSeller")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("users")
+}
+
+// Categorías de productos
+model Category {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  position    Int       @default(0)
+  parentId    String?
+  isActive    Boolean   @default(true)
+  parent      Category? @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children    Category[] @relation("CategoryHierarchy")
+  products    Product[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("categories")
+}
+
+// Marcas de productos
+model Brand {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@map("brands")
+}
+
+// Productos
+model Product {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  price       Float
+  stock       Int           @default(0)
+  sku         String?       @unique
+  image       String?
+  status      String        @default("ACTIVE")
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id])
+  brandId     String
+  brand       Brand         @relation(fields: [brandId], references: [id])
+  // Relación con vendedor (admin que vende este producto)
+  sellerId    String?
+  seller      User?         @relation("ProductSeller", fields: [sellerId], references: [id])
+  orderItems  OrderItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@map("products")
+}
+
+// Clientes
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  address   String?
+  orders    Order[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("customers")
+}
+
+// Órdenes/Ventas (Admin to Admin)
+model Order {
+  id          String      @id @default(cuid())
+  orderNumber String      @unique
+  customerId  String
+  customer    Customer    @relation(fields: [customerId], references: [id])
+  // Admin que compra (buyer)
+  buyerId     String?
+  buyer       User?       @relation("OrderBuyer", fields: [buyerId], references: [id])
+  // Admin que vende (seller)
+  sellerId    String?
+  seller      User?       @relation("OrderSeller", fields: [sellerId], references: [id])
+  status      String      @default("PENDING") // PENDING, EN_PREPARACION, ENVIADO, COMPLETADO, CANCELADO
+  paymentStatus String    @default("PENDING") // PENDING, PAGADO, FALLIDO
+  total       Float
+  subtotal    Float
+  tax         Float       @default(0)
+  shipping    Float       @default(0)
+  items       OrderItem[]
+  history     OrderHistory[] // Historial de modificaciones
+  paymentMethod String?   // TARJETA, TRANSFERENCIA, EFECTIVO, TRANSFERENCIA_INTERNA
+  shippingAddress String?
+  trackingNumber String?
+  notes       String?     // Notas para cambios de estado
+  adminId     String?     // Admin que creó/modificó la orden
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@map("orders")
+}
+
+// Items de órdenes
+model OrderItem {
+  id        String  @id @default(cuid())
+  orderId   String
+  order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  total     Float
+
+  @@map("order_items")
+}
+
+// Historial de modificaciones de órdenes
+model OrderHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  action    String   // CREATED, STATUS_CHANGED, PAYMENT_UPDATED, SHIPPED, etc.
+  previousValue String?
+  newValue  String?
+  notes     String?
+  adminId   String?  // Admin que hizo el cambio
+  adminName String?  // Nombre del admin
+  createdAt DateTime @default(now())
+
+  @@map("order_history")
+}

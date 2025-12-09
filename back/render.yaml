@@ -1,0 +1,29 @@
+services:
+- type: web
+  name: testadmin-api
+  env: node
+  # El root directory es 'back' porque tu backend está en la carpeta /back
+  rootDirectory: back
+  
+  # Comandos de build: instalar dependencias, generar Prisma client y compilar
+  buildCommand: npm install && npx prisma generate && npm run build
+  
+  # Start command: ejecutar migraciones y luego iniciar el servidor
+  startCommand: npx prisma migrate deploy && npm run start:prod
+  
+  # Variables de entorno
+  envVars:
+  - key: DATABASE_URL
+    fromDatabase:
+      name: testadmin-db
+      property: connectionString
+  - key: JWT_SECRET
+    value: tu-super-secret-jwt-key-production-2024
+  - key: JWT_EXPIRES_IN
+    value: 24h
+  - key: NODE_ENV
+    value: production
+  - key: PORT
+    value: 3001
+  - key: FRONTEND_URL
+    value: https://testadmin.vercel.app
